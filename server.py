@@ -1,12 +1,10 @@
 import asyncio
-import signal
 import subprocess
 import websockets
 import json
 import datetime
 import cv2
 import pyaudio
-import wave
 import threading
 
 # Initialize global variables

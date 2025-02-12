@@ -2,9 +2,8 @@ import asyncio
 import websockets
 import tkinter as tk
 import json
-import subprocess
 
-SERVER_IP = "192.168.1.100"  #! Quest 2 PC's IP
+SERVER_IP = "192.168.1.141"  #! Quest 2 PC's IP
 
 async def send_command(command):
     async with websockets.connect(f"ws://{SERVER_IP}:8765") as websocket:
