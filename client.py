@@ -4,7 +4,7 @@ import tkinter as tk
 import json
 import subprocess
 
-SERVER_IP = "192.168.1.129"  #! Quest 2 PC's IP
+SERVER_IP = "127.0.0.1"  #! Quest 2 PC's IP
 
 async def send_command(command):
     async with websockets.connect(f"ws://{SERVER_IP}:8765") as websocket:
@@ -18,20 +18,17 @@ def start_stream():
 def stop_stream():
     asyncio.run(send_command("stop_stream"))
 
+def start_recording():
+    asyncio.run(send_command("start_recording"))
+
+def stop_recording():
+    asyncio.run(send_command("stop_recording"))
+
 def toggle_webcam():
     asyncio.run(send_command("toggle_webcam"))
 
 def toggle_microphone():
     asyncio.run(send_command("toggle_microphone"))
-    
-def view_quest2():
-    subprocess.Popen(["vlc", f"rtsp://{SERVER_IP}:8554/quest2"])
-
-def view_webcam():
-    subprocess.Popen(["vlc", f"rtsp://{SERVER_IP}:8554/webcam"])
-
-def listen_microphone():
-    subprocess.Popen(["vlc", f"rtsp://{SERVER_IP}:8554/microphone"])
 
 # Create GUI
 root = tk.Tk()
@@ -40,14 +37,13 @@ root.title("Remote Oculus Quest 2 Control")
 buttons = [
     ("Start Streaming", start_stream),
     ("Stop Streaming", stop_stream),
+    ("Start Recording", start_recording),
+    ("Stop Recording", stop_recording),
     ("Turn On/Off Webcam", toggle_webcam),
-    ("Turn On/Off Microphone", toggle_microphone),
-    ("View Quest 2 Stream", view_quest2),
-    ("View Webcam Stream", view_webcam),
-    ("Listen to Microphone", listen_microphone)
+    ("Turn On/Off Microphone", toggle_microphone)
 ]
 
 for text, cmd in buttons:
-    tk.Button(root, text=text, command=cmd, width=25, height=2).pack(pady=5)
+    tk.Button(root, text=text, command=cmd, width=20, height=2).pack(pady=10)
 
 root.mainloop()
