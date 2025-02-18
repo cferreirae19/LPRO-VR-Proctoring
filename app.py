@@ -25,7 +25,7 @@ def toggle_recording():
             record_button.config(text="Start Recording")
         else:
             ffmpeg_process = subprocess.Popen([
-                "ffmpeg", "-f", "gdigrab", "-i", "title=Quest 2", "-framerate", "30", "-c:v", "libx264", "output.mp4"
+                "ffmpeg", "-f", "gdigrab", "-i", "title=23043RP34G", "-framerate", "30", "-c:v", "libx264", "output.mp4"
             ], stdin=subprocess.PIPE)
             record_button.config(text="Stop Recording")
         is_recording = not is_recording

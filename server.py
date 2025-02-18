@@ -12,7 +12,6 @@ import threading
 # Initialize global variables
 scrcpy_process = None
 ffmpeg_process = None
-webcam_process = None
 mic_process = None
 is_recording = False
 is_streaming = False
@@ -22,11 +21,13 @@ is_microphone_on = False
 # Webcam and Microphone Settings
 webcam_index = 0  #? Multiple webcams
 mic_index = 1      #? Multiple microphones / not detected
+webcam_name = "HP Wide Vision HD Camera"
+mic_name = "Varios micrófonos (Intel® Smart Sound Technology for Digital Microphones)"
 
 # Function to generate timestamped filename
-def generate_filename(prefix="recording"):
+def generate_filename(prefix="recording", extension=".mp4"):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    return f"{prefix}_{timestamp}.mp4"
+    return f"{prefix}_{timestamp}{extension}"
 
 # Function to start streaming
 def start_stream():
@@ -38,50 +39,95 @@ def start_stream():
 
 # Function to toggle webcam
 def toggle_webcam():
-    global is_webcam_on, webcam_process
-
+    global is_webcam_on
+    is_webcam_on = not is_webcam_on
     if is_webcam_on:
-        is_webcam_on = False
-        print("Webcam turned off.")
-    else:
-        is_webcam_on = True
         threading.Thread(target=show_webcam, daemon=True).start()
         print("Webcam turned on.")
+    else:
+        print("Webcam turned off.")
 
 # Function to show webcam feed
 def show_webcam():
     cap = cv2.VideoCapture(webcam_index)
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(f'{generate_filename("webcam")}', fourcc, 20.0, (640, 480))
     while is_webcam_on:
         ret, frame = cap.read()
         if ret:
             cv2.imshow("Webcam Feed", frame)
+            if is_recording:
+                out.write(frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     cap.release()
+    out.release()
     cv2.destroyAllWindows()
 
 # Function to toggle microphone
 def toggle_microphone():
     global is_microphone_on
+    is_microphone_on = not is_microphone_on
     if is_microphone_on:
-        is_microphone_on = False
-        print("Microphone turned off.")
-    else:
-        is_microphone_on = True
         threading.Thread(target=play_microphone_audio, daemon=True).start()
         print("Microphone turned on.")
+    else:
+        print("Microphone turned off.")
 
 # Function to play microphone audio
 def play_microphone_audio():
+    # Set audio parameters
+    audio_format = pyaudio.paInt16
+    channels = 1
+    sample_rate = 44100
+    frames_per_buffer = 1024
+
+    # Initialize PyAudio    
     pa = pyaudio.PyAudio()
-    stream = pa.open(format=pyaudio.paInt16, channels=1, rate=44100, input=True,
-                     input_device_index=mic_index, frames_per_buffer=1024)
+    
+    # Open input stream (microphone)
+    input_stream = pa.open(format=audio_format,
+                           channels=channels,
+                           rate=sample_rate, input=True,
+                           input_device_index=mic_index,
+                           frames_per_buffer=frames_per_buffer)
+    
+    # Open output stream (speaker playback)
+    output_stream = pa.open(format=audio_format,
+                           channels=channels,
+                           rate=sample_rate,
+                           output=True,
+                           frames_per_buffer=frames_per_buffer)
+    
+    frames = []
+    
     while is_microphone_on:
-        data = stream.read(1024)
-        print(".", end="", flush=True)  # Simulating audio playback
-    stream.stop_stream()
-    stream.close()
+        try:
+            data = input_stream.read(frames_per_buffer)  # Capture audio
+            output_stream.write(data)  # Play the audio in real-time
+            
+            if is_recording:
+                frames.append(data)  # Save to recording buffer
+
+        except Exception as e:
+            print(f"Error during audio processing: {e}")
+            break
+
+    # Stop and close streams
+    input_stream.stop_stream()
+    input_stream.close()
+    output_stream.stop_stream()
+    output_stream.close()
     pa.terminate()
+
+    # Save recording if applicable
+    if frames:
+        audio_filename = generate_filename("audio", ".wav")
+        with wave.open(audio_filename, "wb") as wf:
+            wf.setnchannels(channels)
+            wf.setsampwidth(pa.get_sample_size(audio_format))
+            wf.setframerate(sample_rate)
+            wf.writeframes(b''.join(frames))
 
 # Function to start/stop recording (including webcam & microphone)
 def toggle_recording():
@@ -94,25 +140,22 @@ def toggle_recording():
             ffmpeg_process.wait()
             print("Recording stopped.")
         else:
-            filename = generate_filename()
+            filename_streaming = generate_filename()
+            
             cmd = [
                 "ffmpeg",
                 "-f", "gdigrab", "-framerate", "30", "-i", "title=23043RP34G",
-                "-c:v", "libx264", "-b:v", "5000k", filename
+                "-c:v", "libx264", "-b:v", "5000k", 
+                filename_streaming
             ]
 
-            # Include webcam if enabled
-            if is_webcam_on:
-                filename_webcam = generate_filename("webcam")
-                cmd.extend(["-f", "vfwcap", "-i", str(webcam_index), "-c:v", "libx264", filename_webcam])
-
-            # Include microphone if enabled
-            if is_microphone_on:
-                filename_audio = generate_filename("audio")
-                cmd.extend(["-f", "dshow", "-i", f"audio={mic_index}", "-c:a", "aac", "-b:a", "192k", filename_audio])
+            # # Include microphone if enabled
+            # if is_microphone_on:
+            #     filename_audio = generate_filename("audio")
+            #     cmd.extend(["-f", "dshow", "-i", f"audio={mic_name}", "-c:a", "aac", "-b:a", "192k", filename_audio])
 
             ffmpeg_process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-            print(f"Recording started: {filename}")
+            print(f"Recording started: {filename_streaming}")
 
         is_recording = not is_recording
     else:
@@ -130,7 +173,7 @@ def stop_stream():
     print("Streaming stopped.")
 
 # WebSocket server handler (Supports multiple clients)
-async def websocket_handler(websocket, path):
+async def websocket_handler(websocket):
     try:
         async for message in websocket:
             data = json.loads(message)
@@ -161,4 +204,5 @@ async def start_websocket_server():
         await asyncio.Future()
 
 # Run the WebSocket server
+print("Starting WebSocket server")
 asyncio.run(start_websocket_server())

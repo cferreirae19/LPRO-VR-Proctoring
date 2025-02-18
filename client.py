@@ -39,8 +39,8 @@ buttons = [
     ("Stop Streaming", stop_stream),
     ("Start Recording", start_recording),
     ("Stop Recording", stop_recording),
-    ("Turn On/Off Webcam", toggle_webcam),
-    ("Turn On/Off Microphone", toggle_microphone)
+    ("Toggle Webcam", toggle_webcam),
+    ("Toggle Microphone", toggle_microphone)
 ]
 
 for text, cmd in buttons:
